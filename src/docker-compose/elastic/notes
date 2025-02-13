@@ -1,0 +1,5 @@
+sudo docker network create pebbles-leads
+
+
+Kibana is not ready
+https://github.com/elastic/elasticsearch/issues/90658
