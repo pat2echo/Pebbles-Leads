@@ -2,8 +2,8 @@
 
 Design drafts for reference:  
 
-- ![Draft Design 001](./design/draft-design-001.jpeg)  
-- ![Draft Design 002](./design/draft-design-002.jpeg)  
+- [Draft Design 001](./design/draft-design-001.jpeg)  
+- [Draft Design 002](./design/draft-design-002.jpeg)  
 
 
 
