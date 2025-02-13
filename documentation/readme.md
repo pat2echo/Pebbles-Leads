@@ -1,4 +1,4 @@
-## 🚀 Continuous Integration & Feature Flagging Strategy  
+## 🚀 CI Strategy: Continuous Integration & Feature Flagging  
 
 Our project follows a **Continuous Integration (CI) strategy** for version control, ensuring that changes are frequently merged, tested, and deployed with minimal disruptions. This approach allows us to maintain a stable codebase while accelerating development cycles.  
 
