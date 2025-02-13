@@ -1,3 +1,12 @@
+## 📌 Project Design Drafts  
+
+Design drafts for reference:  
+
+- ![Draft Design 001](./design/draft-design-001.jpeg)  
+- ![Draft Design 002](./design/draft-design-002.jpeg)  
+
+
+
 ## 🚀 CI Strategy: Continuous Integration & Feature Flagging  
 
 Our project follows a **Continuous Integration (CI) strategy** for version control, ensuring that changes are frequently merged, tested, and deployed with minimal disruptions. This approach allows us to maintain a stable codebase while accelerating development cycles.  
