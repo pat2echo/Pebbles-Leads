@@ -14,7 +14,7 @@ This AI-powered tool enhances knowledge accessibility, reduces information overl
 This project follows a structured directory setup to manage backend, frontend, and elastic services efficiently. Below is an overview of the key folders and files:
 
 ## 📂 documentation
-This directory is likely used for storing project-related documentation, guides, and references.
+This directory is used for storing project-related documentation, guides, and references.
 
 ## 📂 src/docker-compose
 This folder contains configurations and resources for managing **Docker Compose** setups.
