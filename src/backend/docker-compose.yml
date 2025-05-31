@@ -1,0 +1,103 @@
+"""
+version: '3.8'
+
+services:
+  # API Gateway
+  api-gateway:
+    build: 
+      context: ./gateway-service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - CORE_RAG_SERVICE_URL=http://core-rag-service:8001
+      - MEMORY_SERVICE_URL=http://memory-service:8002
+      - FEEDBACK_SERVICE_URL=http://feedback-service:8003
+      - INDEXING_SERVICE_URL=http://indexing-service:8004
+    depends_on:
+      - core-rag-service
+      - memory-service
+      - feedback-service
+      - indexing-service
+    networks:
+      - rag-network
+
+  # Core RAG Service
+  core-rag-service:
+    build:
+      context: ./core-rag-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - MEMORY_SERVICE_URL=http://memory-service:8002
+      - FEEDBACK_SERVICE_URL=http://feedback-service:8003
+    volumes:
+      - ./data/chroma_db:/data/chroma_db
+    depends_on:
+      - ollama
+    networks:
+      - rag-network
+
+  # Memory Service
+  memory-service:
+    build:
+      context: ./memory-service
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./data/memory:/data
+    networks:
+      - rag-network
+
+  # Feedback Service
+  feedback-service:
+    build:
+      context: ./feedback-service
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./data/feedback:/data
+    networks:
+      - rag-network
+
+  # Indexing Service
+  indexing-service:
+    build:
+      context: ./indexing-service
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8004"
+    volumes:
+      - ./data/chroma_db:/data/chroma_db
+      - ./data/documents:/data/documents
+    depends_on:
+      - ollama
+    networks:
+      - rag-network
+
+  # Ollama Service
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./data/ollama:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - rag-network
+
+networks:
+  rag-network:
+    driver: bridge
+
+volumes:
+  chroma_data:
+  memory_data:
+  feedback_data:
+  documents_data:
+  ollama_data:
+"""

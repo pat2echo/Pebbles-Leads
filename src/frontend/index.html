@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ask Me? - SU IT Support</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="min-h-screen overflow-hidden font-sans">
+    <!-- Menu Button -->
+    <button id="menu-btn" class="menu-btn w-12 h-12 rounded-xl flex items-center justify-center text-gray-700 hover:text-gray-900">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+        </svg>
+    </button>
+    
+    <!-- Sidebar Overlay -->
+    <div id="sidebar-overlay" class="sidebar-overlay fixed inset-0 bg-black/20 z-40"></div>
+    
+    <!-- Sidebar -->
+    <div id="sidebar" class="sidebar fixed left-0 top-0 h-full w-80 z-50 p-6">
+        <div class="flex items-center justify-between mb-8">
+            <h2 class="text-xl font-semibold text-gray-800">Menu</h2>
+            <button id="close-sidebar" class="text-gray-500 hover:text-gray-700 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        
+        <!-- NEW: Session Info -->
+        <div id="session-info" class="session-info rounded-xl p-4 mb-6 hidden">
+            <h3 class="text-sm font-medium text-blue-800 mb-2">Current Session</h3>
+            <p class="text-xs text-blue-600" id="session-id-display">Session: Loading...</p>
+            <p class="text-xs text-blue-600" id="current-topic-display">Topic: General</p>
+        </div>
+        
+        <nav class="space-y-3">
+            <div class="nav-item p-4 cursor-pointer" id="index-nav">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14-7H5m8 12H5"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-gray-800 font-medium">Index Documents</h3>
+                        <p class="text-gray-600 text-sm">Process and index files</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- NEW: View History -->
+            <div class="nav-item p-4 cursor-pointer" id="history-nav">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-gray-800 font-medium">Conversation History</h3>
+                        <p class="text-gray-600 text-sm">View past conversations</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- NEW: Analytics -->
+            <div class="nav-item p-4 cursor-pointer" id="analytics-nav">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-gray-800 font-medium">Analytics</h3>
+                        <p class="text-gray-600 text-sm">View conversation stats</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="nav-item p-4 cursor-pointer" id="clear-nav">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-gray-800 font-medium">Clear Chat</h3>
+                        <p class="text-gray-600 text-sm">Reset conversation</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="nav-item p-4 cursor-pointer" id="help-nav">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-gray-800 font-medium">Help</h3>
+                        <p class="text-gray-600 text-sm">Get assistance</p>
+                    </div>
+                </div>
+            </div>
+
+
+
+            <!-- 1. ADD NEW SIDEBAR NAVIGATION ITEMS (add to your existing nav section) -->
+            <div class="nav-item p-4 cursor-pointer" id="insights-nav">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-yellow-500 rounded-xl flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-gray-800 font-medium">System Insights</h3>
+                        <p class="text-gray-600 text-sm">Learning & improvements</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="nav-item p-4 cursor-pointer" id="global-feedback-nav">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-gray-800 font-medium">Global Feedback</h3>
+                        <p class="text-gray-600 text-sm">All-time statistics</p>
+                    </div>
+                </div>
+            </div>
+        </nav>
+        
+        <div class="absolute bottom-6 left-6 right-6">
+            <div class="glass-card rounded-xl p-4">
+                <h3 class="text-gray-800 font-medium mb-2">Contact Info</h3>
+                <p class="text-gray-600 text-sm mb-1">suit@essex.ac.uk</p>
+                <p class="text-gray-600 text-sm">(123) 456-7890</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- NEW: Topic Indicator -->
+        <div id="topic-indicator" class="hidden topic-indicator text-white text-center py-2 px-4 text-sm font-medium">
+            <span id="topic-text">Topic changed to: Loading...</span>
+        </div>
+        
+        <!-- App Title -->
+        <div id="app-title" class="app-title centered">
+            <div class="w-16 h-16 glass-card rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">SU IT Support</h1>
+            <p class="text-gray-600 text-lg">Your friendly IT assistant</p>
+        </div>
+        
+        <!-- Chat Area -->
+        <div id="chat-area" class="chat-area">
+            <div class="flex-1 overflow-y-auto px-6 py-4" id="chat-messages-container">
+                <div id="chat-messages" class="max-w-4xl mx-auto">
+                    <!-- Messages will be added here -->
+                </div>
+                <div id="typing-indicator" class="hidden flex justify-start mb-4 max-w-4xl mx-auto">
+                    <div class="message-assistant rounded-2xl px-4 py-3 flex items-center space-x-1">
+                        <div class="typing-indicator"></div>
+                        <div class="typing-indicator"></div>
+                        <div class="typing-indicator"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Input Area -->
+        <div class="input-area">
+            <form id="query-form" class="max-w-4xl mx-auto">
+                <div class="flex items-center space-x-4">
+                    <input
+                        type="text"
+                        id="query-input"
+                        placeholder="Type something..."
+                        class="flex-1 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all text-gray-800 placeholder-gray-500"
+                    />
+                    <button
+                        type="submit"
+                        id="send-button"
+                        class="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center hover:bg-indigo-700 transition-colors"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                        </svg>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Index Modal -->
+    <div id="index-modal" class="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4">
+        <div class="glass-card rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-semibold text-gray-800">Index Documents</h2>
+                <button id="index-close" class="text-gray-500 hover:text-gray-700 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <form id="index-form">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Data Directory</label>
+                    <input
+                        type="text"
+                        id="data-dir"
+                        value="./my_documents"
+                        class="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-800 placeholder-gray-500"
+                        placeholder="./my_documents"
+                    />
+                </div>
+                <button
+                    type="submit"
+                    id="index-button"
+                    class="w-full bg-indigo-600 text-white py-3 px-4 rounded-xl hover:bg-indigo-700 disabled:bg-indigo-300 transition-colors font-medium"
+                >
+                    Index Documents
+                </button>
+            </form>
+            <div id="index-status" class="mt-4 hidden"></div>
+        </div>
+    </div>
+
+    <!-- NEW: History Modal -->
+    <div id="history-modal" class="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4">
+        <div class="glass-card rounded-2xl shadow-xl p-6 w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-semibold text-gray-800">Conversation History</h2>
+                <button id="history-close" class="text-gray-500 hover:text-gray-700 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="history-content" class="flex-1 overflow-y-auto">
+                <div class="text-center text-gray-500 py-8">Loading conversation history...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW: Analytics Modal -->
+    <div id="analytics-modal" class="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4">
+        <div class="glass-card rounded-2xl shadow-xl p-6 w-full max-w-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-semibold text-gray-800">Session Analytics</h2>
+                <button id="analytics-close" class="text-gray-500 hover:text-gray-700 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="analytics-content">
+                <div class="text-center text-gray-500 py-8">Loading analytics...</div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- System Insights Modal -->
+<div id="insights-modal" class="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4">
+    <div class="glass-card rounded-2xl shadow-xl p-6 w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-semibold text-gray-800">System Learning Insights</h2>
+            <button id="insights-close" class="text-gray-500 hover:text-gray-700 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="insights-content" class="flex-1 overflow-y-auto">
+            <div class="text-center text-gray-500 py-8">Loading insights...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Global Feedback Modal -->
+<div id="global-feedback-modal" class="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4">
+    <div class="glass-card rounded-2xl shadow-xl p-6 w-full max-w-3xl">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-semibold text-gray-800">Global Feedback Statistics</h2>
+            <button id="global-feedback-close" class="text-gray-500 hover:text-gray-700 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="global-feedback-content">
+            <div class="text-center text-gray-500 py-8">Loading global feedback...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced Feedback Modal (replace simple thumbs up/down with detailed feedback) -->
+<div id="detailed-feedback-modal" class="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4">
+    <div class="glass-card rounded-2xl shadow-xl p-6 w-full max-w-md">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-semibold text-gray-800">Provide Detailed Feedback</h2>
+            <button id="detailed-feedback-close" class="text-gray-500 hover:text-gray-700 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <form id="detailed-feedback-form">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Rating</label>
+                <div class="flex space-x-2">
+                    <button type="button" class="rating-btn w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center text-sm font-medium hover:border-yellow-500 transition-colors" data-rating="1">1</button>
+                    <button type="button" class="rating-btn w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center text-sm font-medium hover:border-yellow-500 transition-colors" data-rating="2">2</button>
+                    <button type="button" class="rating-btn w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center text-sm font-medium hover:border-yellow-500 transition-colors" data-rating="3">3</button>
+                    <button type="button" class="rating-btn w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center text-sm font-medium hover:border-yellow-500 transition-colors" data-rating="4">4</button>
+                    <button type="button" class="rating-btn w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center text-sm font-medium hover:border-yellow-500 transition-colors" data-rating="5">5</button>
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Comments (optional)</label>
+                <textarea
+                    id="feedback-comments"
+                    rows="3"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none"
+                    placeholder="What did you like or dislike about this response?"
+                ></textarea>
+            </div>
+            <div class="flex space-x-3">
+                <button
+                    type="button"
+                    id="cancel-detailed-feedback"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                    Submit Feedback
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<script src="file.js"></script> 
+</body>
+</html>
