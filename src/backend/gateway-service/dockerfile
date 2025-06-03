@@ -22,4 +22,4 @@ RUN mkdir -p /data
 EXPOSE 8001
 
 # Run the application
-CMD ["python", "app.py"]
+CMD ["python", "/app/app.py"]

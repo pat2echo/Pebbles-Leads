@@ -1,9 +1,7 @@
-"""
-version: '3.8'
-
 services:
   # API Gateway
   api-gateway:
+    container_name: gateway-service
     build: 
       context: ./gateway-service
       dockerfile: Dockerfile
@@ -24,6 +22,7 @@ services:
 
   # Core RAG Service
   core-rag-service:
+    container_name: core-rag-service
     build:
       context: ./core-rag-service
       dockerfile: Dockerfile
@@ -41,6 +40,7 @@ services:
 
   # Memory Service
   memory-service:
+    container_name: memory-service
     build:
       context: ./memory-service
       dockerfile: Dockerfile
@@ -53,6 +53,7 @@ services:
 
   # Feedback Service
   feedback-service:
+    container_name: feedback-service
     build:
       context: ./feedback-service
       dockerfile: Dockerfile
@@ -65,6 +66,7 @@ services:
 
   # Indexing Service
   indexing-service:
+    container_name: indexing-service
     build:
       context: ./indexing-service
       dockerfile: Dockerfile
@@ -80,6 +82,7 @@ services:
 
   # Ollama Service
   ollama:
+    container_name: ollama
     image: ollama/ollama:latest
     ports:
       - "11434:11434"
@@ -87,6 +90,21 @@ services:
       - ./data/ollama:/root/.ollama
     environment:
       - OLLAMA_HOST=0.0.0.0
+    networks:
+      - rag-network
+  
+  web:
+    container_name: web
+    build:
+      context: ./web-service
+      dockerfile: nginx.dockerfile
+    ports:
+      - '80:80'
+    restart: always
+    volumes:
+      - ../frontend:/var/www/html:delegated
+    depends_on:
+      - api-gateway
     networks:
       - rag-network
 
@@ -100,4 +118,3 @@ volumes:
   feedback_data:
   documents_data:
   ollama_data:
-"""
