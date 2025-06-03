@@ -30,8 +30,10 @@ class QueryType(Enum):
 # Core RAG processing logic
 class CoreRAGProcessor:
     def __init__(self):
-        self.llm = Ollama(model="llama3", temperature=0.2)
-        self.embeddings = OllamaEmbeddings(model="nomic-embed-text")
+        self.llm = Ollama(model="llama3", temperature=0.2, 
+            base_url="http://ollama:11434")
+        self.embeddings = OllamaEmbeddings(model="nomic-embed-text", 
+            base_url="http://ollama:11434")
         self.vectorstore = Chroma(
             persist_directory="/data/chroma_db",
             embedding_function=self.embeddings

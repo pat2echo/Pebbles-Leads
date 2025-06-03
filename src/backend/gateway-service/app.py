@@ -29,13 +29,13 @@ def proxy_request(service_url: str, path: str = '', method: str = 'GET',
         url = f"{service_url}{path}"
         
         if method == 'GET':
-            response = requests.get(url, params=params, timeout=30)
+            response = requests.get(url, params=params, timeout=300)
         elif method == 'POST':
-            response = requests.post(url, json=data, params=params, timeout=30)
+            response = requests.post(url, json=data, params=params, timeout=300)
         elif method == 'PUT':
-            response = requests.put(url, json=data, params=params, timeout=30)
+            response = requests.put(url, json=data, params=params, timeout=300)
         elif method == 'DELETE':
-            response = requests.delete(url, params=params, timeout=30)
+            response = requests.delete(url, params=params, timeout=300)
         else:
             return jsonify({"error": "Unsupported method"}), 400
         
@@ -59,7 +59,7 @@ def health_check():
     
     for service_name, service_url in SERVICES.items():
         try:
-            response = requests.get(f"{service_url}/health", timeout=5)
+            response = requests.get(f"{service_url}/health", timeout=30)
             health_status[service_name] = {
                 "status": "healthy" if response.status_code == 200 else "unhealthy",
                 "response_time": response.elapsed.total_seconds()
