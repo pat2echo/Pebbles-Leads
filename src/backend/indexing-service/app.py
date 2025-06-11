@@ -244,6 +244,32 @@ class EnhancedIndexingService:
             return {"status": "success", "message": "Collection cleared"}
         except Exception as e:
             return {"status": "error", "message": str(e)}
+            
+    def get_first_five_index_entries(self) -> Dict[str, Any]:
+        """Get the first 5 entries in the index"""
+        try:
+            collection = self.vectorstore._collection
+            results = collection.get(limit=5)
+            return {
+                "status": "success",
+                "documents": [
+                    {
+                        "id": doc_id,
+                        "metadata": metadata,
+                        "content": content
+                    } for doc_id, metadata, content in zip(
+                        results.get('ids', []),
+                        results.get('metadatas', []),
+                        results.get('documents', [])
+                    )
+                ],
+                "total_returned": len(results.get('ids', []))
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": str(e)
+            }
 
 # Initialize service
 indexing_service = EnhancedIndexingService()
@@ -322,5 +348,11 @@ def list_tasks():
     
     return jsonify({"tasks": tasks})
 
+@app.route('/index/first-five', methods=['GET'])
+def get_first_five_entries():
+    """Get the first 5 entries in the index"""
+    result = indexing_service.get_first_five_index_entries()
+    return jsonify(result)
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8004, debug=True)

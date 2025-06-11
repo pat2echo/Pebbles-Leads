@@ -196,5 +196,35 @@ def clear_collection():
         method='POST'
     )
 
+
+@app.route('/api/feedback/insights', methods=['GET'])
+def get_feedback_insights():
+    """Get learning insights from feedback"""
+    return proxy_request(
+        SERVICES['feedback'],
+        '/insights',
+        method='GET',
+        params=request.args
+    )
+
+@app.route('/api/topics/<session_id>', methods=['GET'])
+def get_topic_transitions(session_id):
+    """Get topic transitions for a session"""
+    return proxy_request(
+        SERVICES['memory'],
+        f'/topics/{session_id}',
+        method='GET'
+    )
+
+@app.route('/api/feedback/session/<session_id>', methods=['GET'])
+def get_session_feedback_summary(session_id):
+    """Get feedback summary for a session"""
+    return proxy_request(
+        SERVICES['feedback'],
+        f'/summary/session/{session_id}',
+        method='GET'
+    )
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, debug=True)

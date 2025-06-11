@@ -17,6 +17,7 @@ sleep 10
 
 # Pull required models
 docker-compose exec ollama ollama pull llama3
+docker-compose exec ollama ollama pull tinyllama
 docker-compose exec ollama ollama pull nomic-embed-text
 
 echo "RAG System is ready!"
