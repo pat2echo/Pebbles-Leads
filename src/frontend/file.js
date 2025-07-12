@@ -1,13 +1,24 @@
+// CORRECTED FRONTEND JAVASCRIPT - Replace your existing script section
+
+
   // ENHANCED STATE MANAGEMENT
   let isLoading = false;
   let messages = [];
   let chatStarted = false;
   let sidebarOpen = false;
-  let sessionId = localStorage.getItem('rag-session-id') || generateUUID(); // NEW
-  let currentTopic = 'general'; // NEW
+  let sessionId = localStorage.getItem('rag-session-id') || generateUUID();
+  let currentTopic = 'general';
+  let currentQuery = '';
+  let currentResponse = '';
+  let currentQueryType = '';
+  let currentStrategy = '';
+  let currentConfidence = 0;
   
   // Store session ID in localStorage
   localStorage.setItem('rag-session-id', sessionId);
+  
+  // CORRECTED API BASE URL
+  const API_BASE_URL = 'http://localhost:8000'; // Changed from 5000 to 8000
   
   // NEW: Utility function to generate UUID
   function generateUUID() {
@@ -37,9 +48,11 @@
   const clearNav = document.getElementById('clear-nav');
   const helpNav = document.getElementById('help-nav');
   
-  // NEW: Enhanced sidebar elements
+  // Enhanced sidebar elements
   const historyNav = document.getElementById('history-nav');
   const analyticsNav = document.getElementById('analytics-nav');
+  const insightsNav = document.getElementById('insights-nav');
+  const globalFeedbackNav = document.getElementById('global-feedback-nav');
   const sessionInfo = document.getElementById('session-info');
   const sessionIdDisplay = document.getElementById('session-id-display');
   const currentTopicDisplay = document.getElementById('current-topic-display');
@@ -52,33 +65,55 @@
   const indexButton = document.getElementById('index-button');
   const indexStatusDiv = document.getElementById('index-status');
   
-  // NEW: Enhanced modal elements
+  // Enhanced modal elements
   const historyModal = document.getElementById('history-modal');
   const historyClose = document.getElementById('history-close');
   const historyContent = document.getElementById('history-content');
   const analyticsModal = document.getElementById('analytics-modal');
   const analyticsClose = document.getElementById('analytics-close');
   const analyticsContent = document.getElementById('analytics-content');
+  const insightsModal = document.getElementById('insights-modal');
+  const insightsClose = document.getElementById('insights-close');
+  const insightsContent = document.getElementById('insights-content');
+  const globalFeedbackModal = document.getElementById('global-feedback-modal');
+  const globalFeedbackClose = document.getElementById('global-feedback-close');
+  const globalFeedbackContent = document.getElementById('global-feedback-content');
+  const detailedFeedbackModal = document.getElementById('detailed-feedback-modal');
+  const detailedFeedbackClose = document.getElementById('detailed-feedback-close');
   const topicIndicator = document.getElementById('topic-indicator');
   const topicText = document.getElementById('topic-text');
   
-  // NEW: Update session info display
+  // Global variables for detailed feedback
+  let currentFeedbackTurnId = null;
+  let selectedRating = 0;
+  
+  // Update session info display
   const updateSessionInfo = () => {
-      sessionIdDisplay.textContent = `Session: ${sessionId.substring(0, 8)}...`;
-      currentTopicDisplay.textContent = `Topic: ${currentTopic.replace('_', ' ')}`;
-      sessionInfo.classList.remove('hidden');
+      if (sessionIdDisplay) {
+          sessionIdDisplay.textContent = `Session: ${sessionId.substring(0, 8)}...`;
+      }
+      if (currentTopicDisplay) {
+          currentTopicDisplay.textContent = `Topic: ${currentTopic.replace('_', ' ')}`;
+      }
+      if (sessionInfo) {
+          sessionInfo.classList.remove('hidden');
+      }
   };
   
-  // NEW: Show topic change notification
+  // Show topic change notification
   const showTopicChange = (newTopic) => {
-      topicText.textContent = `Topic changed to: ${newTopic.replace('_', ' ')}`;
-      topicIndicator.classList.remove('hidden');
-      setTimeout(() => {
-          topicIndicator.classList.add('hidden');
-      }, 3000);
+      if (topicText) {
+          topicText.textContent = `Topic changed to: ${newTopic.replace('_', ' ')}`;
+      }
+      if (topicIndicator) {
+          topicIndicator.classList.remove('hidden');
+          setTimeout(() => {
+              topicIndicator.classList.add('hidden');
+          }, 3000);
+      }
   };
   
-  // Utility functions (existing)
+  // Utility functions
   const getCurrentTime = () => {
       const now = new Date();
       const hours = String(now.getHours()).padStart(2, '0');
@@ -101,11 +136,11 @@
           appTitle.classList.remove('centered');
           appTitle.classList.add('top-positioned');
           chatArea.classList.add('active');
-          updateSessionInfo(); // NEW
+          updateSessionInfo();
       }
   };
   
-  // ENHANCED: Add message with feedback capability
+  // Add message with feedback capability
   const addMessage = (text, isUser = false, turnId = null, confidence = null) => {
       if (!chatStarted) startChat();
       
@@ -113,25 +148,30 @@
           text, 
           isUser, 
           time: getCurrentTime(), 
-          turnId, // NEW
-          confidence, // NEW
-          feedbackGiven: false // NEW
+          turnId,
+          confidence,
+          feedbackGiven: false
       };
       messages.push(message);
       renderMessages();
   };
   
-  // NEW: Submit feedback function
+  // Submit feedback function
   const submitFeedback = async (turnId, score, comments = '') => {
       try {
-          const response = await fetch('http://localhost:8000/api/feedback', {
+          const response = await fetch(`${API_BASE_URL}/api/feedback`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                   session_id: sessionId,
                   turn_id: turnId,
                   score: score,
-                  comments: comments
+                  comments: comments,
+                  query_text: currentQuery,
+                  response_text: currentResponse,
+                  query_type: currentQueryType,
+                  strategy_used: currentStrategy,
+                  confidence: currentConfidence
               })
           });
           
@@ -145,7 +185,6 @@
                   renderMessages();
               }
               
-              // Show success notification
               showNotification('Feedback submitted successfully!', 'success');
           }
       } catch (error) {
@@ -154,7 +193,7 @@
       }
   };
   
-  // NEW: Show notification function
+  // Show notification function
   const showNotification = (message, type = 'info') => {
       const notification = document.createElement('div');
       notification.className = `fixed top-4 right-4 z-50 px-4 py-2 rounded-lg text-white text-sm font-medium transition-all transform translate-x-full ${
@@ -178,7 +217,7 @@
       }, 3000);
   };
   
-  // ENHANCED: Render messages with feedback buttons
+  // Render messages with feedback buttons
   const renderMessages = () => {
       chatMessages.innerHTML = '';
       messages.forEach((message, index) => {
@@ -249,10 +288,10 @@
       chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
   };
   
-  // NEW: Load conversation history
+  // Load conversation history
   const loadConversationHistory = async () => {
       try {
-          const response = await fetch(`http://localhost:8000/api/conversation/${sessionId}?max_turns=20`);
+          const response = await fetch(`${API_BASE_URL}/api/conversation/${sessionId}?max_turns=20`);
           const data = await response.json();
           
           if (data.turns && data.turns.length > 0) {
@@ -296,58 +335,41 @@
       }
   };
   
-  // NEW: Load analytics
+  // Load analytics
   const loadAnalytics = async () => {
       try {
-          const response = await fetch(`http://localhost:8000/api/analytics/${sessionId}`);
+          const response = await fetch(`${API_BASE_URL}/api/analytics/${sessionId}`);
           const data = await response.json();
           
-          if (data.total_turns > 0) {
+          if (data.total_feedback > 0) {
               analyticsContent.innerHTML = `
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div class="analytics-card rounded-xl p-4">
                           <h3 class="font-medium text-gray-800 mb-3">Session Stats</h3>
                           <div class="space-y-2 text-sm">
                               <div class="flex justify-between">
-                                  <span class="text-gray-600">Total Messages:</span>
-                                  <span class="font-medium">${data.total_turns}</span>
+                                  <span class="text-gray-600">Total Feedback:</span>
+                                  <span class="font-medium">${data.total_feedback}</span>
                               </div>
                               <div class="flex justify-between">
-                                  <span class="text-gray-600">Session Duration:</span>
-                                  <span class="font-medium">${data.session_duration.toFixed(1)}h</span>
+                                  <span class="text-gray-600">Avg Score:</span>
+                                  <span class="font-medium">${Math.round(data.average_score * 100)}%</span>
                               </div>
                               <div class="flex justify-between">
                                   <span class="text-gray-600">Avg Confidence:</span>
                                   <span class="font-medium">${Math.round(data.average_confidence * 100)}%</span>
                               </div>
-                              ${data.average_feedback_score ? `
-                                  <div class="flex justify-between">
-                                      <span class="text-gray-600">Avg Rating:</span>
-                                      <span class="font-medium text-green-600">${Math.round(data.average_feedback_score * 100)}%</span>
-                                  </div>
-                              ` : ''}
                           </div>
                       </div>
                       
                       <div class="analytics-card rounded-xl p-4">
                           <h3 class="font-medium text-gray-800 mb-3">Query Types</h3>
                           <div class="space-y-2 text-sm">
-                              ${Object.entries(data.query_type_distribution).map(([type, count]) => `
+                              ${Object.entries(data.query_type_distribution || {}).map(([type, count]) => `
                                   <div class="flex justify-between">
                                       <span class="text-gray-600 capitalize">${type}:</span>
                                       <span class="font-medium">${count}</span>
                                   </div>
-                              `).join('')}
-                          </div>
-                      </div>
-                      
-                      <div class="analytics-card rounded-xl p-4 md:col-span-2">
-                          <h3 class="font-medium text-gray-800 mb-3">Topics Covered</h3>
-                          <div class="flex flex-wrap gap-2">
-                              ${data.topics_covered.map(topic => `
-                                  <span class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm">
-                                      ${topic.replace('_', ' ')}
-                                  </span>
                               `).join('')}
                           </div>
                       </div>
@@ -362,7 +384,207 @@
       }
   };
   
-  // Sidebar functionality (existing)
+  // Load system insights
+  const loadSystemInsights = async () => {
+      try {
+          const [insightsResponse, improvementsResponse] = await Promise.all([
+              fetch(`${API_BASE_URL}/api/feedback/insights`),
+              fetch(`${API_BASE_URL}/api/feedback/improvements`)
+          ]);
+          
+          const insights = await insightsResponse.json();
+          const improvements = await improvementsResponse.json();
+          
+          if (insights.status === 'success' && improvements.status === 'success') {
+              insightsContent.innerHTML = `
+                  <div class="space-y-6">
+                      <!-- System Improvements Section -->
+                      <div class="bg-blue-50 rounded-xl p-6">
+                          <h3 class="text-lg font-semibold text-blue-900 mb-4">System Improvement Suggestions</h3>
+                          ${improvements.improvements.improvement_suggestions?.length > 0 ? `
+                              <div class="space-y-3">
+                                  ${improvements.improvements.improvement_suggestions.map(suggestion => `
+                                      <div class="flex items-start space-x-3">
+                                          <div class="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                                          <p class="text-blue-800">${suggestion.suggestion}</p>
+                                      </div>
+                                  `).join('')}
+                              </div>
+                          ` : '<p class="text-blue-600">No specific improvements identified yet.</p>'}
+                      </div>
+                      
+                      <!-- Strategy Performance Section -->
+                      <div class="bg-green-50 rounded-xl p-6">
+                          <h3 class="text-lg font-semibold text-green-900 mb-4">Strategy Performance</h3>
+                          ${Object.keys(improvements.improvements.strategy_performance || {}).length > 0 ? `
+                              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  ${Object.entries(improvements.improvements.strategy_performance).map(([strategy, perf]) => `
+                                      <div class="bg-white rounded-lg p-4 border border-green-200">
+                                          <h4 class="font-medium text-green-800 capitalize">${strategy}</h4>
+                                          <p class="text-sm text-green-600">Avg Score: ${(perf.avg_score * 100).toFixed(1)}%</p>
+                                          <p class="text-sm text-green-600">Uses: ${perf.count}</p>
+                                      </div>
+                                  `).join('')}
+                              </div>
+                          ` : '<p class="text-green-600">No strategy data available yet.</p>'}
+                      </div>
+                      
+                      <!-- Learning Insights Section -->
+                      <div class="bg-purple-50 rounded-xl p-6">
+                          <h3 class="text-lg font-semibold text-purple-900 mb-4">Learning Insights</h3>
+                          ${insights.insights?.length > 0 ? `
+                              <div class="space-y-4">
+                                  ${insights.insights.slice(0, 5).map(insight => `
+                                      <div class="bg-white rounded-lg p-4 border border-purple-200">
+                                          <div class="flex justify-between items-start mb-2">
+                                              <h4 class="font-medium text-purple-800 capitalize">
+                                                  ${insight.type.replace(/_/g, ' ')}
+                                              </h4>
+                                              <span class="text-sm bg-purple-100 text-purple-700 px-2 py-1 rounded">
+                                                  ${(insight.effectiveness * 100).toFixed(0)}% effective
+                                              </span>
+                                          </div>
+                                          <p class="text-sm text-purple-600">Used ${insight.usage_count} times</p>
+                                      </div>
+                                  `).join('')}
+                              </div>
+                          ` : '<p class="text-purple-600">No learning insights available yet.</p>'}
+                      </div>
+                      
+                      <!-- Common Issues Section -->
+                      ${improvements.improvements.common_issues?.length > 0 ? `
+                          <div class="bg-red-50 rounded-xl p-6">
+                              <h3 class="text-lg font-semibold text-red-900 mb-4">Common Issues</h3>
+                              <div class="space-y-2">
+                                  ${improvements.improvements.common_issues.map(issue => `
+                                      <div class="flex justify-between items-center bg-white rounded-lg p-3 border border-red-200">
+                                          <p class="text-red-800 text-sm">${issue.issue}</p>
+                                          <span class="text-red-600 text-sm font-medium">${issue.frequency}x</span>
+                                      </div>
+                                  `).join('')}
+                              </div>
+                          </div>
+                      ` : ''}
+                  </div>
+              `;
+          } else {
+              insightsContent.innerHTML = '<div class="text-center text-red-500 py-8">Failed to load insights.</div>';
+          }
+      } catch (error) {
+          console.error('Error loading insights:', error);
+          insightsContent.innerHTML = '<div class="text-center text-red-500 py-8">Failed to load insights.</div>';
+      }
+  };
+  
+  // Load global feedback statistics
+  const loadGlobalFeedback = async () => {
+      try {
+          const response = await fetch(`${API_BASE_URL}/api/feedback/summary/global`);
+          const data = await response.json();
+          
+          if (data.status === 'success') {
+              const feedback = data.global_feedback;
+              globalFeedbackContent.innerHTML = `
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <!-- Overall Statistics -->
+                      <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6">
+                          <h3 class="text-lg font-semibold text-indigo-900 mb-4">Overall Statistics</h3>
+                          <div class="space-y-3">
+                              <div class="flex justify-between">
+                                  <span class="text-indigo-700">Total Feedback:</span>
+                                  <span class="font-semibold text-indigo-900">${feedback.total_feedback}</span>
+                              </div>
+                              <div class="flex justify-between">
+                                  <span class="text-indigo-700">Average Score:</span>
+                                  <span class="font-semibold text-indigo-900">${(feedback.average_score * 100).toFixed(1)}%</span>
+                              </div>
+                              <div class="flex justify-between">
+                                  <span class="text-indigo-700">Learning Insights:</span>
+                                  <span class="font-semibold text-indigo-900">${feedback.learning_insights_count || 0}</span>
+                              </div>
+                          </div>
+                      </div>
+                      
+                      <!-- Score Distribution -->
+                      <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6">
+                          <h3 class="text-lg font-semibold text-emerald-900 mb-4">Score Distribution</h3>
+                          <div class="space-y-3">
+                              <div class="flex justify-between items-center">
+                                  <span class="text-emerald-700">High (80%+):</span>
+                                  <div class="flex items-center space-x-2">
+                                      <div class="w-16 bg-emerald-200 rounded-full h-2">
+                                          <div class="bg-emerald-500 h-2 rounded-full" style="width: ${feedback.total_feedback > 0 ? (feedback.score_distribution.high / feedback.total_feedback) * 100 : 0}%"></div>
+                                      </div>
+                                      <span class="font-semibold text-emerald-900">${feedback.score_distribution.high}</span>
+                                  </div>
+                              </div>
+                              <div class="flex justify-between items-center">
+                                  <span class="text-emerald-700">Medium (40-80%):</span>
+                                  <div class="flex items-center space-x-2">
+                                      <div class="w-16 bg-yellow-200 rounded-full h-2">
+                                          <div class="bg-yellow-500 h-2 rounded-full" style="width: ${feedback.total_feedback > 0 ? (feedback.score_distribution.medium / feedback.total_feedback) * 100 : 0}%"></div>
+                                      </div>
+                                      <span class="font-semibold text-emerald-900">${feedback.score_distribution.medium}</span>
+                                  </div>
+                              </div>
+                              <div class="flex justify-between items-center">
+                                  <span class="text-emerald-700">Low (<40%):</span>
+                                  <div class="flex items-center space-x-2">
+                                      <div class="w-16 bg-red-200 rounded-full h-2">
+                                          <div class="bg-red-500 h-2 rounded-full" style="width: ${feedback.total_feedback > 0 ? (feedback.score_distribution.low / feedback.total_feedback) * 100 : 0}%"></div>
+                                      </div>
+                                      <span class="font-semibold text-emerald-900">${feedback.score_distribution.low}</span>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+                  
+                  ${Object.keys(feedback.patterns || {}).length > 0 ? `
+                      <div class="mt-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6">
+                          <h3 class="text-lg font-semibold text-purple-900 mb-4">Learning Patterns</h3>
+                          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              ${Object.entries(feedback.patterns).slice(0, 6).map(([pattern, score]) => `
+                                  <div class="bg-white rounded-lg p-3 border border-purple-200">
+                                      <p class="text-sm font-medium text-purple-800">${pattern.replace(/_/g, ' ')}</p>
+                                      <p class="text-xs text-purple-600">Impact: ${score.toFixed(2)}</p>
+                                  </div>
+                              `).join('')}
+                          </div>
+                      </div>
+                  ` : ''}
+              `;
+          } else {
+              globalFeedbackContent.innerHTML = '<div class="text-center text-red-500 py-8">Failed to load global feedback.</div>';
+          }
+      } catch (error) {
+          console.error('Error loading global feedback:', error);
+          globalFeedbackContent.innerHTML = '<div class="text-center text-red-500 py-8">Failed to load global feedback.</div>';
+      }
+  };
+  
+  // Enhanced feedback modal functionality
+  const showDetailedFeedbackModal = (turnId) => {
+      currentFeedbackTurnId = turnId;
+      selectedRating = 0;
+      
+      const feedbackCommentsEl = document.getElementById('feedback-comments');
+      if (feedbackCommentsEl) {
+          feedbackCommentsEl.value = '';
+      }
+      
+      // Reset rating buttons
+      document.querySelectorAll('.rating-btn').forEach(btn => {
+          btn.classList.remove('bg-yellow-500', 'text-white', 'border-yellow-500');
+          btn.classList.add('border-gray-300');
+      });
+      
+      if (detailedFeedbackModal) {
+          detailedFeedbackModal.classList.remove('hidden');
+      }
+  };
+  
+  // Sidebar functionality
   const toggleSidebar = () => {
       sidebarOpen = !sidebarOpen;
       sidebar.classList.toggle('active', sidebarOpen);
@@ -375,486 +597,334 @@
       sidebarOverlay.classList.remove('active');
   };
   
-  // Event listeners (existing + new)
-  menuBtn.addEventListener('click', toggleSidebar);
-  closeSidebar.addEventListener('click', closeSidebarFn);
-  sidebarOverlay.addEventListener('click', closeSidebarFn);
+  // Event listeners
+  if (menuBtn) menuBtn.addEventListener('click', toggleSidebar);
+  if (closeSidebar) closeSidebar.addEventListener('click', closeSidebarFn);
+  if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebarFn);
   
-  indexNav.addEventListener('click', () => {
-      closeSidebarFn();
-      indexModal.classList.remove('hidden');
-  });
+  if (indexNav) {
+      indexNav.addEventListener('click', () => {
+          closeSidebarFn();
+          if (indexModal) indexModal.classList.remove('hidden');
+      });
+  }
   
-  // NEW: History navigation
-  historyNav.addEventListener('click', () => {
-      closeSidebarFn();
-      historyModal.classList.remove('hidden');
-      loadConversationHistory();
-  });
+  // History navigation
+  if (historyNav) {
+      historyNav.addEventListener('click', () => {
+          closeSidebarFn();
+          if (historyModal) historyModal.classList.remove('hidden');
+          loadConversationHistory();
+      });
+  }
   
-  // NEW: Analytics navigation
-  analyticsNav.addEventListener('click', () => {
-      closeSidebarFn();
-      analyticsModal.classList.remove('hidden');
-      loadAnalytics();
-  });
+  // Analytics navigation
+  if (analyticsNav) {
+      analyticsNav.addEventListener('click', () => {
+          closeSidebarFn();
+          if (analyticsModal) analyticsModal.classList.remove('hidden');
+          loadAnalytics();
+      });
+  }
   
-  clearNav.addEventListener('click', () => {
-      closeSidebarFn();
-      messages = [];
-      renderMessages();
-      chatStarted = false;
-      appTitle.classList.remove('top-positioned');
-      appTitle.classList.add('centered');
-      chatArea.classList.remove('active');
-      // Generate new session ID
-      sessionId = generateUUID();
-      localStorage.setItem('rag-session-id', sessionId);
-      currentTopic = 'general';
-      sessionInfo.classList.add('hidden');
-  });
+  // Insights navigation
+  if (insightsNav) {
+      insightsNav.addEventListener('click', () => {
+          closeSidebarFn();
+          if (insightsModal) insightsModal.classList.remove('hidden');
+          loadSystemInsights();
+      });
+  }
   
-  helpNav.addEventListener('click', () => {
-      closeSidebarFn();
-      addMessage("I'm here to help you with IT support questions. You can ask me about technical issues, software problems, or general IT guidance. I'll remember our conversation and learn from your feedback!", false);
-  });
+  // Global feedback navigation
+  if (globalFeedbackNav) {
+      globalFeedbackNav.addEventListener('click', () => {
+          closeSidebarFn();
+          if (globalFeedbackModal) globalFeedbackModal.classList.remove('hidden');
+          loadGlobalFeedback();
+      });
+  }
   
-  indexClose.addEventListener('click', () => {
-      indexModal.classList.add('hidden');
-  });
+  if (clearNav) {
+      clearNav.addEventListener('click', () => {
+          closeSidebarFn();
+          messages = [];
+          renderMessages();
+          chatStarted = false;
+          appTitle.classList.remove('top-positioned');
+          appTitle.classList.add('centered');
+          chatArea.classList.remove('active');
+          // Generate new session ID
+          sessionId = generateUUID();
+          localStorage.setItem('rag-session-id', sessionId);
+          currentTopic = 'general';
+          if (sessionInfo) sessionInfo.classList.add('hidden');
+      });
+  }
   
-  // NEW: Modal close handlers
-  historyClose.addEventListener('click', () => {
-      historyModal.classList.add('hidden');
-  });
+  if (helpNav) {
+      helpNav.addEventListener('click', () => {
+          closeSidebarFn();
+          addMessage("I'm here to help you with IT support questions. You can ask me about technical issues, software problems, or general IT guidance. I'll remember our conversation and learn from your feedback!", false);
+      });
+  }
   
-  analyticsClose.addEventListener('click', () => {
-      analyticsModal.classList.add('hidden');
-  });
+  // Modal close handlers
+  if (indexClose) {
+      indexClose.addEventListener('click', () => {
+          if (indexModal) indexModal.classList.add('hidden');
+      });
+  }
   
-  // ENHANCED: Form submission with session management
-  queryForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      if (isLoading) return;
-      
-      const query = queryInput.value.trim();
-      if (!query) return;
-      
-      addMessage(query, true);
-      queryInput.value = '';
-      
-      isLoading = true;
-      showTyping();
-      
-      try {
-          const res = await fetch('http://localhost:8000/api/query', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                  query,
-                  session_id: sessionId // NEW: Include session ID
-              })
+  if (historyClose) {
+      historyClose.addEventListener('click', () => {
+          if (historyModal) historyModal.classList.add('hidden');
+      });
+  }
+  
+  if (analyticsClose) {
+      analyticsClose.addEventListener('click', () => {
+          if (analyticsModal) analyticsModal.classList.add('hidden');
+      });
+  }
+  
+  if (insightsClose) {
+      insightsClose.addEventListener('click', () => {
+          if (insightsModal) insightsModal.classList.add('hidden');
+      });
+  }
+  
+  if (globalFeedbackClose) {
+      globalFeedbackClose.addEventListener('click', () => {
+          if (globalFeedbackModal) globalFeedbackModal.classList.add('hidden');
+      });
+  }
+  
+  if (detailedFeedbackClose) {
+      detailedFeedbackClose.addEventListener('click', () => {
+          if (detailedFeedbackModal) detailedFeedbackModal.classList.add('hidden');
+      });
+  }
+  
+  // Rating button functionality
+  document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('rating-btn')) {
+          selectedRating = parseInt(e.target.dataset.rating);
+          
+          // Update button styles
+          document.querySelectorAll('.rating-btn').forEach((btn, index) => {
+              if (index < selectedRating) {
+                  btn.classList.remove('border-gray-300');
+                  btn.classList.add('bg-yellow-500', 'text-white', 'border-yellow-500');
+              } else {
+                  btn.classList.remove('bg-yellow-500', 'text-white', 'border-yellow-500');
+                  btn.classList.add('border-gray-300');
+              }
           });
+      }
+  });
+  
+  // Cancel detailed feedback
+  const cancelDetailedFeedbackBtn = document.getElementById('cancel-detailed-feedback');
+  if (cancelDetailedFeedbackBtn) {
+      cancelDetailedFeedbackBtn.addEventListener('click', () => {
+          if (detailedFeedbackModal) detailedFeedbackModal.classList.add('hidden');
+      });
+  }
+  
+  // Enhanced detailed feedback form submission
+  const detailedFeedbackForm = document.getElementById('detailed-feedback-form');
+  if (detailedFeedbackForm) {
+      detailedFeedbackForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
           
-          const data = await res.json();
-          hideTyping();
+          if (selectedRating === 0) {
+              showNotification('Please select a rating', 'error');
+              return;
+          }
           
-          if (data.answer) {
-              // NEW: Handle topic changes
-              if (data.topic_changed && data.current_topic !== currentTopic) {
-                  currentTopic = data.current_topic;
-                  showTopicChange(currentTopic);
-                  updateSessionInfo();
+          const feedbackCommentsEl = document.getElementById('feedback-comments');
+          const comments = feedbackCommentsEl ? feedbackCommentsEl.value.trim() : '';
+          const score = selectedRating / 5.0; // Convert 1-5 to 0.0-1.0
+          
+          try {
+              const response = await fetch(`${API_BASE_URL}/api/feedback`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      session_id: sessionId,
+                      turn_id: currentFeedbackTurnId,
+                      score: score,
+                      comments: comments,
+                      query_text: currentQuery,
+                      response_text: currentResponse,
+                      query_type: currentQueryType,
+                      strategy_used: currentStrategy,
+                      confidence: currentConfidence
+                  })
+              });
+              
+              const data = await response.json();
+              
+              if (data.status === 'success') {
+                  // Update message to show feedback was given
+                  const messageIndex = messages.findIndex(m => m.turnId === currentFeedbackTurnId);
+                  if (messageIndex !== -1) {
+                      messages[messageIndex].feedbackGiven = true;
+                      renderMessages();
+                  }
+                  
+                  if (detailedFeedbackModal) detailedFeedbackModal.classList.add('hidden');
+                  showNotification(`Thank you for your ${selectedRating}-star feedback!`, 'success');
+              } else {
+                  showNotification('Failed to submit feedback', 'error');
+              }
+          } catch (error) {
+              console.error('Error submitting detailed feedback:', error);
+              showNotification('Failed to submit feedback', 'error');
+          }
+      });
+  }
+  
+  // Form submission with session management
+  if (queryForm) {
+      queryForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          if (isLoading) return;
+          
+          const query = queryInput.value.trim();
+          if (!query) return;
+          
+          // Store current query for feedback
+          currentQuery = query;
+          
+          addMessage(query, true);
+          queryInput.value = '';
+          
+          isLoading = true;
+          showTyping();
+          
+          try {
+              const res = await fetch(`${API_BASE_URL}/api/query`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                      query,
+                      session_id: sessionId
+                  })
+              });
+              
+              const data = await res.json();
+              hideTyping();
+              
+              if (data.answer) {
+                  // Store response data for feedback
+                  currentResponse = data.answer;
+                  currentQueryType = data.query_type;
+                  currentStrategy = data.strategy_used;
+                  currentConfidence = data.confidence;
+                  
+                  // Handle topic changes
+                  if (data.topic_changed && data.current_topic !== currentTopic) {
+                      currentTopic = data.current_topic;
+                      showTopicChange(currentTopic);
+                      updateSessionInfo();
+                  }
+                  
+                  // Add message with enhanced data
+                  addMessage(
+                      data.answer, 
+                      false, 
+                      data.turn_id, 
+                      data.confidence
+                  );
+              } else {
+                  addMessage("Sorry, I couldn't process your request. Please make sure the backend is running.", false);
+              }
+          } catch (err) {
+              hideTyping();
+              addMessage("Connection error. Please check if the backend server is running.", false);
+          } finally {
+              isLoading = false;
+          }
+      });
+  }
+  
+  // Index form
+  if (indexForm) {
+      indexForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          if (isLoading) return;
+          
+          isLoading = true;
+          if (indexButton) {
+              indexButton.textContent = 'Processing...';
+              indexButton.disabled = true;
+          }
+          if (indexStatusDiv) indexStatusDiv.classList.add('hidden');
+          
+          try {
+              const res = await fetch(`${API_BASE_URL}/api/index`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ data_dir: dataDirInput ? dataDirInput.value : './my_documents' })
+              });
+              
+              const data = await res.json();
+              
+              if (indexStatusDiv) {
+                  indexStatusDiv.innerHTML = `
+                      <div class="p-4 rounded-xl glass-card ${data.status === 'success' ? 'text-green-700' : 'text-red-700'}">
+                          <p class="font-medium">
+                              ${data.status === 'success' 
+                                  ? `Successfully indexed ${data.indexed_files?.length || 0} files` 
+                                  : `Error: ${data.message}`}
+                          </p>
+                          ${data.errors && data.errors.length > 0 ? `
+                              <ul class="mt-2 text-sm list-disc pl-5">
+                                  ${data.errors.map(err => `<li>${err.file}: ${err.error}</li>`).join('')}
+                              </ul>
+                          ` : ''}
+                      </div>
+                  `;
+                  indexStatusDiv.classList.remove('hidden');
               }
               
-              // NEW: Add message with enhanced data
-              addMessage(
-                  data.answer, 
-                  false, 
-                  data.turn_id, 
-                  data.confidence
-              );
-          } else {
-              addMessage("Sorry, I couldn't process your request. Please make sure the backend is running.", false);
+          } catch (err) {
+              if (indexStatusDiv) {
+                  indexStatusDiv.innerHTML = `
+                      <div class="p-4 rounded-xl glass-card text-red-700">
+                          <p class="font-medium">Failed to index documents. Please check if the backend is running.</p>
+                      </div>
+                  `;
+                  indexStatusDiv.classList.remove('hidden');
+              }
+          } finally {
+              isLoading = false;
+              if (indexButton) {
+                  indexButton.textContent = 'Index Documents';
+                  indexButton.disabled = false;
+              }
           }
-      } catch (err) {
-          hideTyping();
-          addMessage("Connection error. Please check if the backend server is running.", false);
-      } finally {
-          isLoading = false;
-      }
-  });
+      });
+  }
   
-  // Index form (existing)
-  indexForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      if (isLoading) return;
-      
-      isLoading = true;
-      indexButton.textContent = 'Processing...';
-      indexButton.disabled = true;
-      indexStatusDiv.classList.add('hidden');
-      
-      try {
-          const res = await fetch('http://localhost:8000/api/index', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ data_dir: dataDirInput.value })
-          });
-          
-          const data = await res.json();
-          
-          indexStatusDiv.innerHTML = `
-              <div class="p-4 rounded-xl glass-card ${data.status === 'success' ? 'text-green-700' : 'text-red-700'}">
-                  <p class="font-medium">
-                      ${data.status === 'success' 
-                          ? `Successfully indexed ${data.indexed_files?.length || 0} files` 
-                          : `Error: ${data.message}`}
-                  </p>
-                  ${data.errors && data.errors.length > 0 ? `
-                      <ul class="mt-2 text-sm list-disc pl-5">
-                          ${data.errors.map(err => `<li>${err.file}: ${err.error}</li>`).join('')}
-                      </ul>
-                  ` : ''}
-              </div>
-          `;
-          indexStatusDiv.classList.remove('hidden');
-          
-      } catch (err) {
-          indexStatusDiv.innerHTML = `
-              <div class="p-4 rounded-xl glass-card text-red-700">
-                  <p class="font-medium">Failed to index documents. Please check if the backend is running.</p>
-              </div>
-          `;
-          indexStatusDiv.classList.remove('hidden');
-      } finally {
-          isLoading = false;
-          indexButton.textContent = 'Index Documents';
-          indexButton.disabled = false;
-      }
-  });
-  
-  // Health check on load (existing)
+  // Health check on load
   const checkHealth = async () => {
       try {
-          const res = await fetch('http://localhost:8000/api/health');
+          const res = await fetch(`${API_BASE_URL}/health`);
           const data = await res.json();
-          console.log("Backend connected successfully");
+          console.log("Backend connected successfully", data);
       } catch (err) {
-          console.log("Backend connection failed");
+          console.log("Backend connection failed", err);
+          showNotification('Backend connection failed. Make sure microservices are running on port 8000.', 'error');
       }
   };
   
-  // NEW: Make submitFeedback available globally
+  // Make functions available globally
   window.submitFeedback = submitFeedback;
+  window.showDetailedFeedbackModal = showDetailedFeedbackModal;
   
   // Initialize
   checkHealth();
-  updateSessionInfo(); // NEW: Show session info on load
-
-
-  // NEW: Global variables for detailed feedback
-let currentFeedbackTurnId = null;
-let selectedRating = 0;
-
-// NEW: Modal elements
-const insightsNav = document.getElementById('insights-nav');
-const globalFeedbackNav = document.getElementById('global-feedback-nav');
-const insightsModal = document.getElementById('insights-modal');
-const globalFeedbackModal = document.getElementById('global-feedback-modal');
-const detailedFeedbackModal = document.getElementById('detailed-feedback-modal');
-
-const insightsClose = document.getElementById('insights-close');
-const globalFeedbackClose = document.getElementById('global-feedback-close');
-const detailedFeedbackClose = document.getElementById('detailed-feedback-close');
-
-const insightsContent = document.getElementById('insights-content');
-const globalFeedbackContent = document.getElementById('global-feedback-content');
-
-// NEW: Load system insights
-const loadSystemInsights = async () => {
-try {
-  const [insightsResponse, improvementsResponse] = await Promise.all([
-      fetch('http://localhost:8000/api/feedback/insights'),
-      fetch('http://localhost:8000/api/feedback/improvements')
-  ]);
-  
-  const insights = await insightsResponse.json();
-  const improvements = await improvementsResponse.json();
-  
-  if (insights.status === 'success' && improvements.status === 'success') {
-      insightsContent.innerHTML = `
-          <div class="space-y-6">
-              <!-- System Improvements Section -->
-              <div class="bg-blue-50 rounded-xl p-6">
-                  <h3 class="text-lg font-semibold text-blue-900 mb-4">System Improvement Suggestions</h3>
-                  ${improvements.improvements.improvement_suggestions?.length > 0 ? `
-                      <div class="space-y-3">
-                          ${improvements.improvements.improvement_suggestions.map(suggestion => `
-                              <div class="flex items-start space-x-3">
-                                  <div class="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                                  <p class="text-blue-800">${suggestion.suggestion}</p>
-                              </div>
-                          `).join('')}
-                      </div>
-                  ` : '<p class="text-blue-600">No specific improvements identified yet.</p>'}
-              </div>
-              
-              <!-- Strategy Performance Section -->
-              <div class="bg-green-50 rounded-xl p-6">
-                  <h3 class="text-lg font-semibold text-green-900 mb-4">Strategy Performance</h3>
-                  ${Object.keys(improvements.improvements.strategy_performance || {}).length > 0 ? `
-                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          ${Object.entries(improvements.improvements.strategy_performance).map(([strategy, perf]) => `
-                              <div class="bg-white rounded-lg p-4 border border-green-200">
-                                  <h4 class="font-medium text-green-800 capitalize">${strategy}</h4>
-                                  <p class="text-sm text-green-600">Avg Score: ${(perf.avg_score * 100).toFixed(1)}%</p>
-                                  <p class="text-sm text-green-600">Uses: ${perf.count}</p>
-                              </div>
-                          `).join('')}
-                      </div>
-                  ` : '<p class="text-green-600">No strategy data available yet.</p>'}
-              </div>
-              
-              <!-- Learning Insights Section -->
-              <div class="bg-purple-50 rounded-xl p-6">
-                  <h3 class="text-lg font-semibold text-purple-900 mb-4">Learning Insights</h3>
-                  ${insights.insights?.length > 0 ? `
-                      <div class="space-y-4">
-                          ${insights.insights.slice(0, 5).map(insight => `
-                              <div class="bg-white rounded-lg p-4 border border-purple-200">
-                                  <div class="flex justify-between items-start mb-2">
-                                      <h4 class="font-medium text-purple-800 capitalize">
-                                          ${insight.type.replace(/_/g, ' ')}
-                                      </h4>
-                                      <span class="text-sm bg-purple-100 text-purple-700 px-2 py-1 rounded">
-                                          ${(insight.effectiveness * 100).toFixed(0)}% effective
-                                      </span>
-                                  </div>
-                                  <p class="text-sm text-purple-600">Used ${insight.usage_count} times</p>
-                              </div>
-                          `).join('')}
-                      </div>
-                  ` : '<p class="text-purple-600">No learning insights available yet.</p>'}
-              </div>
-              
-              <!-- Common Issues Section -->
-              ${improvements.improvements.common_issues?.length > 0 ? `
-                  <div class="bg-red-50 rounded-xl p-6">
-                      <h3 class="text-lg font-semibold text-red-900 mb-4">Common Issues</h3>
-                      <div class="space-y-2">
-                          ${improvements.improvements.common_issues.map(issue => `
-                              <div class="flex justify-between items-center bg-white rounded-lg p-3 border border-red-200">
-                                  <p class="text-red-800 text-sm">${issue.issue}</p>
-                                  <span class="text-red-600 text-sm font-medium">${issue.frequency}x</span>
-                              </div>
-                          `).join('')}
-                      </div>
-                  </div>
-              ` : ''}
-          </div>
-      `;
-  } else {
-      insightsContent.innerHTML = '<div class="text-center text-red-500 py-8">Failed to load insights.</div>';
-  }
-} catch (error) {
-  console.error('Error loading insights:', error);
-  insightsContent.innerHTML = '<div class="text-center text-red-500 py-8">Failed to load insights.</div>';
-}
-};
-
-// NEW: Load global feedback statistics
-const loadGlobalFeedback = async () => {
-try {
-  const response = await fetch('http://localhost:8000/api/feedback/summary/global');
-  const data = await response.json();
-  
-  if (data.status === 'success') {
-      const feedback = data.global_feedback;
-      globalFeedbackContent.innerHTML = `
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <!-- Overall Statistics -->
-              <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6">
-                  <h3 class="text-lg font-semibold text-indigo-900 mb-4">Overall Statistics</h3>
-                  <div class="space-y-3">
-                      <div class="flex justify-between">
-                          <span class="text-indigo-700">Total Feedback:</span>
-                          <span class="font-semibold text-indigo-900">${feedback.total_feedback}</span>
-                      </div>
-                      <div class="flex justify-between">
-                          <span class="text-indigo-700">Average Score:</span>
-                          <span class="font-semibold text-indigo-900">${(feedback.average_score * 100).toFixed(1)}%</span>
-                      </div>
-                      <div class="flex justify-between">
-                          <span class="text-indigo-700">Learning Insights:</span>
-                          <span class="font-semibold text-indigo-900">${feedback.learning_insights_count || 0}</span>
-                      </div>
-                  </div>
-              </div>
-              
-              <!-- Score Distribution -->
-              <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6">
-                  <h3 class="text-lg font-semibold text-emerald-900 mb-4">Score Distribution</h3>
-                  <div class="space-y-3">
-                      <div class="flex justify-between items-center">
-                          <span class="text-emerald-700">High (80%+):</span>
-                          <div class="flex items-center space-x-2">
-                              <div class="w-16 bg-emerald-200 rounded-full h-2">
-                                  <div class="bg-emerald-500 h-2 rounded-full" style="width: ${feedback.total_feedback > 0 ? (feedback.score_distribution.high / feedback.total_feedback) * 100 : 0}%"></div>
-                              </div>
-                              <span class="font-semibold text-emerald-900">${feedback.score_distribution.high}</span>
-                          </div>
-                      </div>
-                      <div class="flex justify-between items-center">
-                          <span class="text-emerald-700">Medium (40-80%):</span>
-                          <div class="flex items-center space-x-2">
-                              <div class="w-16 bg-yellow-200 rounded-full h-2">
-                                  <div class="bg-yellow-500 h-2 rounded-full" style="width: ${feedback.total_feedback > 0 ? (feedback.score_distribution.medium / feedback.total_feedback) * 100 : 0}%"></div>
-                              </div>
-                              <span class="font-semibold text-emerald-900">${feedback.score_distribution.medium}</span>
-                          </div>
-                      </div>
-                      <div class="flex justify-between items-center">
-                          <span class="text-emerald-700">Low (<40%):</span>
-                          <div class="flex items-center space-x-2">
-                              <div class="w-16 bg-red-200 rounded-full h-2">
-                                  <div class="bg-red-500 h-2 rounded-full" style="width: ${feedback.total_feedback > 0 ? (feedback.score_distribution.low / feedback.total_feedback) * 100 : 0}%"></div>
-                              </div>
-                              <span class="font-semibold text-emerald-900">${feedback.score_distribution.low}</span>
-                          </div>
-                      </div>
-                  </div>
-              </div>
-          </div>
-          
-          ${Object.keys(feedback.patterns || {}).length > 0 ? `
-              <div class="mt-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6">
-                  <h3 class="text-lg font-semibold text-purple-900 mb-4">Learning Patterns</h3>
-                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      ${Object.entries(feedback.patterns).slice(0, 6).map(([pattern, score]) => `
-                          <div class="bg-white rounded-lg p-3 border border-purple-200">
-                              <p class="text-sm font-medium text-purple-800">${pattern.replace(/_/g, ' ')}</p>
-                              <p class="text-xs text-purple-600">Impact: ${score.toFixed(2)}</p>
-                          </div>
-                      `).join('')}
-                  </div>
-              </div>
-          ` : ''}
-      `;
-  } else {
-      globalFeedbackContent.innerHTML = '<div class="text-center text-red-500 py-8">Failed to load global feedback.</div>';
-  }
-} catch (error) {
-  console.error('Error loading global feedback:', error);
-  globalFeedbackContent.innerHTML = '<div class="text-center text-red-500 py-8">Failed to load global feedback.</div>';
-}
-};
-
-// NEW: Enhanced feedback modal functionality
-const showDetailedFeedbackModal = (turnId) => {
-currentFeedbackTurnId = turnId;
-selectedRating = 0;
-document.getElementById('feedback-comments').value = '';
-
-// Reset rating buttons
-document.querySelectorAll('.rating-btn').forEach(btn => {
-  btn.classList.remove('bg-yellow-500', 'text-white', 'border-yellow-500');
-  btn.classList.add('border-gray-300');
-});
-
-detailedFeedbackModal.classList.remove('hidden');
-};
-
-// NEW: Rating button functionality
-document.addEventListener('click', (e) => {
-if (e.target.classList.contains('rating-btn')) {
-  selectedRating = parseInt(e.target.dataset.rating);
-  
-  // Update button styles
-  document.querySelectorAll('.rating-btn').forEach((btn, index) => {
-      if (index < selectedRating) {
-          btn.classList.remove('border-gray-300');
-          btn.classList.add('bg-yellow-500', 'text-white', 'border-yellow-500');
-      } else {
-          btn.classList.remove('bg-yellow-500', 'text-white', 'border-yellow-500');
-          btn.classList.add('border-gray-300');
-      }
-  });
-}
-});
-
-// NEW: Event listeners for new features
-insightsNav.addEventListener('click', () => {
-closeSidebarFn();
-insightsModal.classList.remove('hidden');
-loadSystemInsights();
-});
-
-globalFeedbackNav.addEventListener('click', () => {
-closeSidebarFn();
-globalFeedbackModal.classList.remove('hidden');
-loadGlobalFeedback();
-});
-
-insightsClose.addEventListener('click', () => {
-insightsModal.classList.add('hidden');
-});
-
-globalFeedbackClose.addEventListener('click', () => {
-globalFeedbackModal.classList.add('hidden');
-});
-
-detailedFeedbackClose.addEventListener('click', () => {
-detailedFeedbackModal.classList.add('hidden');
-});
-
-document.getElementById('cancel-detailed-feedback').addEventListener('click', () => {
-detailedFeedbackModal.classList.add('hidden');
-});
-
-// NEW: Enhanced detailed feedback form submission
-document.getElementById('detailed-feedback-form').addEventListener('submit', async (e) => {
-e.preventDefault();
-
-if (selectedRating === 0) {
-  showNotification('Please select a rating', 'error');
-  return;
-}
-
-const comments = document.getElementById('feedback-comments').value.trim();
-const score = selectedRating / 5.0; // Convert 1-5 to 0.0-1.0
-
-try {
-  const response = await fetch('http://localhost:8000/api/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-          session_id: sessionId,
-          turn_id: currentFeedbackTurnId,
-          score: score,
-          comments: comments
-      })
-  });
-  
-  const data = await response.json();
-  
-  if (data.status === 'success') {
-      // Update message to show feedback was given
-      const messageIndex = messages.findIndex(m => m.turnId === currentFeedbackTurnId);
-      if (messageIndex !== -1) {
-          messages[messageIndex].feedbackGiven = true;
-          renderMessages();
-      }
-      
-      detailedFeedbackModal.classList.add('hidden');
-      showNotification(`Thank you for your ${selectedRating}-star feedback!`, 'success');
-  } else {
-      showNotification('Failed to submit feedback', 'error');
-  }
-} catch (error) {
-  console.error('Error submitting detailed feedback:', error);
-  showNotification('Failed to submit feedback', 'error');
-}
-});
-
-window.showDetailedFeedbackModal = showDetailedFeedbackModal;
+  updateSessionInfo();

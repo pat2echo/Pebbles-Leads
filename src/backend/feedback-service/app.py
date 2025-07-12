@@ -1,3 +1,101 @@
+# feedback-service
+import os
+import logging
+from flask import Flask, jsonify
+from flask_cors import CORS
+import psutil
+import time
+import sqlite3
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+
+# Configure logging for production
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Prometheus metrics
+REQUEST_COUNT = Counter('http_requests_total', 'Total HTTP requests', ['method', 'endpoint'])
+REQUEST_DURATION = Histogram('http_request_duration_seconds', 'HTTP request duration')
+
+app = Flask(__name__)
+CORS(app)
+
+# Production configuration
+app.config.update(
+    SECRET_KEY=os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production'),
+    DEBUG=False,
+    TESTING=False,
+    ENV='production'
+)
+
+# Health check endpoint
+@app.route('/health')
+def health_check():
+    """Health check endpoint for load balancer"""
+    try:
+        # Add your service-specific health checks here
+        # e.g., database connection, external service checks
+        
+        memory_usage = psutil.virtual_memory().percent
+        cpu_usage = psutil.cpu_percent(interval=1)
+        
+        health_status = {
+            'status': 'healthy',
+            'service': os.environ.get('SERVICE_NAME', 'unknown'),
+            'memory_usage_percent': memory_usage,
+            'cpu_usage_percent': cpu_usage,
+            'timestamp': int(time.time())
+        }
+        
+        # Consider unhealthy if resource usage is too high
+        if memory_usage > 90 or cpu_usage > 90:
+            health_status['status'] = 'unhealthy'
+            return jsonify(health_status), 503
+            
+        return jsonify(health_status), 200
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': int(time.time())
+        }), 503
+
+# Metrics endpoint for Prometheus monitoring
+@app.route('/metrics')
+def metrics():
+    """Prometheus metrics endpoint"""
+    return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
+
+# Middleware for request tracking
+@app.before_request
+def before_request():
+    """Track request metrics"""
+    from flask import request
+    REQUEST_COUNT.labels(method=request.method, endpoint=request.endpoint).inc()
+
+@app.after_request
+def after_request(response):
+    """Log requests in production"""
+    from flask import request
+    logger.info(f"{request.method} {request.path} - {response.status_code}")
+    return response
+
+# Error handlers
+@app.errorhandler(404)
+def not_found_error(error):
+    return jsonify({'error': 'Not found'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Internal server error: {str(error)}")
+    return jsonify({'error': 'Internal server error'}), 500
+
+
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import sqlite3
@@ -551,5 +649,9 @@ def get_session_feedback_summary(session_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8003, debug=True)
+    # This will only run in development
+    # In production, Gunicorn will handle the app
+    port = int(os.environ.get('PORT', 8000))
+    app.run(host='0.0.0.0', port=port, debug=False)

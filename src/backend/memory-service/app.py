@@ -1,3 +1,135 @@
+# memory-service
+import os
+import logging
+from flask import Flask, jsonify
+from flask_cors import CORS
+import psutil
+import time
+import sqlite3
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+
+# Configure logging for production
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Prometheus metrics
+REQUEST_COUNT = Counter('http_requests_total', 'Total HTTP requests', ['method', 'endpoint'])
+REQUEST_DURATION = Histogram('http_request_duration_seconds', 'HTTP request duration')
+
+app = Flask(__name__)
+CORS(app)
+
+# Production configuration
+app.config.update(
+    SECRET_KEY=os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production'),
+    DEBUG=False,
+    TESTING=False,
+    ENV='production'
+)
+
+@app.route('/health')
+def health_check():
+    """Health check endpoint for load balancer"""
+    try:
+        memory_usage = psutil.virtual_memory().percent
+        cpu_usage = psutil.cpu_percent(interval=1)
+        
+        health_status = {
+            'status': 'healthy',
+            'service': os.environ.get('SERVICE_NAME', 'unknown'),
+            'memory_usage_percent': memory_usage,
+            'cpu_usage_percent': cpu_usage,
+            'timestamp': int(time.time())
+        }
+        
+        # Service-specific health checks
+        service_name = os.environ.get('SERVICE_NAME', '')
+        
+        # For database services
+        if 'memory-service' in service_name:
+            try:
+                # Check if we can connect to the database
+                db_path = "/data/memory.db"
+                with sqlite3.connect(db_path) as conn:
+                    conn.execute('SELECT 1').fetchone()
+                health_status['database_healthy'] = True
+            except Exception as e:
+                health_status['database_healthy'] = False
+                health_status['database_error'] = str(e)
+                
+        elif 'feedback-service' in service_name:
+            try:
+                db_path = "/data/feedback.db"
+                with sqlite3.connect(db_path) as conn:
+                    conn.execute('SELECT 1').fetchone()
+                health_status['database_healthy'] = True
+            except Exception as e:
+                health_status['database_healthy'] = False
+                health_status['database_error'] = str(e)
+                
+        elif 'core-rag-service' in service_name or 'indexing-service' in service_name:
+            try:
+                # Check if Ollama is reachable
+                response = requests.get("http://ollama:11434/api/tags", timeout=5)
+                health_status['ollama_healthy'] = response.status_code == 200
+            except Exception as e:
+                health_status['ollama_healthy'] = False
+                health_status['ollama_error'] = str(e)
+        
+        # Consider unhealthy if resource usage is too high or dependencies are down
+        if memory_usage > 90 or cpu_usage > 90:
+            health_status['status'] = 'unhealthy'
+            return jsonify(health_status), 503
+            
+        # Check for database/dependency issues
+        if ('database_healthy' in health_status and not health_status['database_healthy']) or \
+           ('ollama_healthy' in health_status and not health_status['ollama_healthy']):
+            health_status['status'] = 'degraded'
+            
+        return jsonify(health_status), 200
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': int(time.time())
+        }), 503
+
+# Metrics endpoint for Prometheus monitoring
+@app.route('/metrics')
+def metrics():
+    """Prometheus metrics endpoint"""
+    return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
+
+# Middleware for request tracking
+@app.before_request
+def before_request():
+    """Track request metrics"""
+    from flask import request
+    REQUEST_COUNT.labels(method=request.method, endpoint=request.endpoint).inc()
+
+@app.after_request
+def after_request(response):
+    """Log requests in production"""
+    from flask import request
+    logger.info(f"{request.method} {request.path} - {response.status_code}")
+    return response
+
+# Error handlers
+@app.errorhandler(404)
+def not_found_error(error):
+    return jsonify({'error': 'Not found'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Internal server error: {str(error)}")
+    return jsonify({'error': 'Internal server error'}), 500
+
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import sqlite3
@@ -563,5 +695,10 @@ def update_feedback():
     else:
         return jsonify({"error": "Failed to update feedback"}), 500
 
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8002, debug=True)
+    # This will only run in development
+    # In production, Gunicorn will handle the app
+    port = int(os.environ.get('PORT', 8000))
+    app.run(host='0.0.0.0', port=port, debug=False)
+    

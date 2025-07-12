@@ -1,17 +1,40 @@
 services:
+  # Nginx Load Balancer/Reverse Proxy
+  nginx:
+    container_name: nginx-proxy
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      #- ./nginx/conf.d:/etc/nginx/conf.d:ro
+      #- ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api-gateway
+      - core-rag-service
+      - memory-service
+      - feedback-service
+      - indexing-service
+    networks:
+      - rag-network
+    restart: unless-stopped
+
   # API Gateway
   api-gateway:
     container_name: gateway-service
     build: 
       context: ./gateway-service
       dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     environment:
-      - CORE_RAG_SERVICE_URL=http://core-rag-service:8001
-      - MEMORY_SERVICE_URL=http://memory-service:8002
-      - FEEDBACK_SERVICE_URL=http://feedback-service:8003
-      - INDEXING_SERVICE_URL=http://indexing-service:8004
+      - CORE_RAG_SERVICE_URL=http://core-rag-service:8000
+      - MEMORY_SERVICE_URL=http://memory-service:8000
+      - FEEDBACK_SERVICE_URL=http://feedback-service:8000
+      - INDEXING_SERVICE_URL=http://indexing-service:8000
+      - FLASK_ENV=production
+      - WORKERS=4
     depends_on:
       - core-rag-service
       - memory-service
@@ -19,59 +42,98 @@ services:
       - indexing-service
     networks:
       - rag-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Core RAG Service
   core-rag-service:
+    user: "1000:1000"  # Use host user UID/GID
     container_name: core-rag-service
     build:
       context: ./core-rag-service
       dockerfile: Dockerfile
-    ports:
-      - "8001:8001"
+    expose:
+      - "8001"
     environment:
-      - MEMORY_SERVICE_URL=http://memory-service:8002
-      - FEEDBACK_SERVICE_URL=http://feedback-service:8003
+      - MEMORY_SERVICE_URL=http://memory-service:8000
+      - FEEDBACK_SERVICE_URL=http://feedback-service:8000
+      - FLASK_ENV=production
+      - WORKERS=4
     volumes:
       - ./data/chroma_db:/data/chroma_db
     depends_on:
       - ollama
     networks:
       - rag-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Memory Service
   memory-service:
+    user: "1000:1000"  # Use host user UID/GID
     container_name: memory-service
     build:
       context: ./memory-service
       dockerfile: Dockerfile
-    ports:
-      - "8002:8002"
+    expose:
+      - "8002"
+    environment:
+      - FLASK_ENV=production
+      - WORKERS=2
     volumes:
       - ./data/memory:/data
     networks:
       - rag-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Feedback Service
   feedback-service:
+    user: "1000:1000"  # Use host user UID/GID
     container_name: feedback-service
     build:
       context: ./feedback-service
       dockerfile: Dockerfile
-    ports:
-      - "8003:8003"
+    expose:
+      - "8003"
+    environment:
+      - FLASK_ENV=production
+      - WORKERS=2
     volumes:
       - ./data/feedback:/data
     networks:
       - rag-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Indexing Service
   indexing-service:
+    user: "1000:1000"  # Use host user UID/GID
     container_name: indexing-service
     build:
       context: ./indexing-service
       dockerfile: Dockerfile
-    ports:
-      - "8004:8004"
+    expose:
+      - "8004"
+    environment:
+      - FLASK_ENV=production
+      - WORKERS=2
     volumes:
       - ./data/chroma_db:/data/chroma_db
       - ./data/documents:/data/documents
@@ -79,6 +141,12 @@ services:
       - ollama
     networks:
       - rag-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Ollama Service
   ollama:
@@ -92,19 +160,19 @@ services:
       - OLLAMA_HOST=0.0.0.0
     networks:
       - rag-network
-  
+    restart: unless-stopped
+
+  # Web Frontend
   web:
-    container_name: web
+    container_name: web-frontend
     build:
       context: ./web-service
       dockerfile: nginx.dockerfile
-    ports:
-      - '80:80'
-    restart: always
+    expose:
+      - "80"
+    restart: unless-stopped
     volumes:
       - ../frontend:/var/www/html:delegated
-    depends_on:
-      - api-gateway
     networks:
       - rag-network
 

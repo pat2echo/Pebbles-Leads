@@ -3,23 +3,46 @@ API Gateway - Routes requests to appropriate microservices
 Port: 8000 (main entry point)
 """
 
+import os
+import logging
+import time
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import requests
-import os
 import json
 from typing import Dict, Any
 import uuid
+import psutil
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+
+# Configure logging for production
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Prometheus metrics
+REQUEST_COUNT = Counter('http_requests_total', 'Total HTTP requests', ['method', 'endpoint'])
+REQUEST_DURATION = Histogram('http_request_duration_seconds', 'HTTP request duration')
 
 app = Flask(__name__)
 CORS(app)
 
+# Production configuration
+app.config.update(
+    SECRET_KEY=os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production'),
+    DEBUG=False,
+    TESTING=False,
+    ENV='production'
+)
+
 # Service URLs
 SERVICES = {
-    'core_rag': os.getenv('CORE_RAG_SERVICE_URL', 'http://core-rag-service:8001'),
-    'memory': os.getenv('MEMORY_SERVICE_URL', 'http://memory-service:8002'),
-    'feedback': os.getenv('FEEDBACK_SERVICE_URL', 'http://feedback-service:8003'),
-    'indexing': os.getenv('INDEXING_SERVICE_URL', 'http://indexing-service:8004')
+    'core_rag': os.getenv('CORE_RAG_SERVICE_URL', 'http://core-rag-service:8000'),
+    'memory': os.getenv('MEMORY_SERVICE_URL', 'http://memory-service:8000'),
+    'feedback': os.getenv('FEEDBACK_SERVICE_URL', 'http://feedback-service:8000'),
+    'indexing': os.getenv('INDEXING_SERVICE_URL', 'http://indexing-service:8000')
 }
 
 def proxy_request(service_url: str, path: str = '', method: str = 'GET', 
@@ -52,32 +75,97 @@ def proxy_request(service_url: str, path: str = '', method: str = 'GET',
     except Exception as e:
         return jsonify({"error": f"Proxy error: {str(e)}"}), 500
 
+# Middleware for request tracking
+@app.before_request
+def before_request():
+    """Track request metrics"""
+    REQUEST_COUNT.labels(method=request.method, endpoint=request.endpoint).inc()
+
+@app.after_request
+def after_request(response):
+    """Log requests in production"""
+    logger.info(f"{request.method} {request.path} - {response.status_code}")
+    return response
+
+# Error handlers
+@app.errorhandler(404)
+def not_found_error(error):
+    return jsonify({'error': 'Not found'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Internal server error: {str(error)}")
+    return jsonify({'error': 'Internal server error'}), 500
+
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check for all services"""
-    health_status = {}
-    
-    for service_name, service_url in SERVICES.items():
-        try:
-            response = requests.get(f"{service_url}/health", timeout=30)
-            health_status[service_name] = {
-                "status": "healthy" if response.status_code == 200 else "unhealthy",
-                "response_time": response.elapsed.total_seconds()
-            }
-        except Exception as e:
-            health_status[service_name] = {
-                "status": "unhealthy",
-                "error": str(e)
-            }
-    
-    overall_status = "healthy" if all(
-        service["status"] == "healthy" for service in health_status.values()
-    ) else "unhealthy"
-    
-    return jsonify({
-        "overall_status": overall_status,
-        "services": health_status
-    })
+    """Health check for API Gateway and all downstream services"""
+    try:
+        # Check own service health
+        memory_usage = psutil.virtual_memory().percent
+        cpu_usage = psutil.cpu_percent(interval=1)
+        
+        gateway_health = {
+            'hi': 'hip',
+            'status': 'healthy',
+            'service': 'api-gateway',
+            'memory_usage_percent': memory_usage,
+            'cpu_usage_percent': cpu_usage,
+            'timestamp': int(time.time())
+        }
+        
+        # Check if gateway itself is unhealthy
+        if memory_usage > 90 or cpu_usage > 90:
+            gateway_health['status'] = 'unhealthy'
+        
+        # Check downstream services
+        services_health = {}
+        for service_name, service_url in SERVICES.items():
+            try:
+                response = requests.get(f"{service_url}/health", timeout=20)
+                services_health[service_name] = {
+                    "service_url": service_url,
+                    "status": "healthy" if response.status_code == 200 else "unhealthy",
+                    "note": "" if response.status_code == 200 else "possibly due to ollama not running, test it via http://localhost:11434/api/tags",
+                    "response_time": response.elapsed.total_seconds()
+                }
+            except Exception as e:
+                services_health[service_name] = {
+                    "status": "unhealthy",
+                    "note": "possibly due to ollama not running, test it via http://localhost:11434/api/tags",
+                    "error": str(e)
+                }
+        
+        # Determine overall status
+        overall_status = "healthy"
+        if gateway_health['status'] == 'unhealthy':
+            overall_status = "unhealthy"
+        elif any(service["status"] == "unhealthy" for service in services_health.values()):
+            overall_status = "degraded"  # Gateway is healthy but some services aren't
+        
+        response_data = {
+            "overall_status": overall_status,
+            "gateway": gateway_health,
+            "services": services_health
+        }
+        
+        # Return 503 if gateway itself is unhealthy, 200 otherwise
+        status_code = 503 if gateway_health['status'] == 'unhealthy' else 200
+        return jsonify(response_data), status_code
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': int(time.time())
+        }), 503
+
+# Metrics endpoint for Prometheus monitoring
+@app.route('/metrics')
+def metrics():
+    """Prometheus metrics endpoint"""
+    return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
 
 # ==============================================
 # RAG QUERY ENDPOINTS
@@ -196,7 +284,6 @@ def clear_collection():
         method='POST'
     )
 
-
 @app.route('/api/feedback/insights', methods=['GET'])
 def get_feedback_insights():
     """Get learning insights from feedback"""
@@ -225,6 +312,8 @@ def get_session_feedback_summary(session_id):
         method='GET'
     )
 
-
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000, debug=True)
+    # This will only run in development
+    # In production, Gunicorn will handle the app
+    port = int(os.environ.get('PORT', 8000))
+    app.run(host='0.0.0.0', port=port, debug=False)

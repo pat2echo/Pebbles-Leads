@@ -1,3 +1,51 @@
 MODEL_NAME=llama3
 EMBEDDING_NAME_1=nomic-embed-text
 EMBEDDING_NAME_2=all-minilm:l6-v2
+
+# .env.production - Production environment variables
+# Copy this to .env.production and update with your values
+
+# Flask Configuration
+SECRET_KEY=your-very-secure-secret-key-here
+FLASK_ENV=production
+
+# Service Configuration
+API_GATEWAY_WORKERS=4
+CORE_RAG_WORKERS=4
+MEMORY_SERVICE_WORKERS=2
+FEEDBACK_SERVICE_WORKERS=2
+INDEXING_SERVICE_WORKERS=2
+
+# Database Configuration (if applicable)
+# DATABASE_URL=postgresql://user:password@db:5432/dbname
+
+# Redis Configuration (if applicable)
+# REDIS_URL=redis://redis:6379/0
+
+# External API Keys
+# OPENAI_API_KEY=your-openai-key
+# ANTHROPIC_API_KEY=your-anthropic-key
+
+# Monitoring
+PROMETHEUS_ENABLED=true
+LOG_LEVEL=INFO
+
+# Security
+ALLOWED_HOSTS=localhost,yourdomain.com
+CORS_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
+
+# SSL Configuration (if using HTTPS)
+# SSL_CERT_PATH=/etc/nginx/ssl/cert.pem
+# SSL_KEY_PATH=/etc/nginx/ssl/key.pem
+
+# Resource Limits
+MAX_CONTENT_LENGTH=100MB
+REQUEST_TIMEOUT=30
+
+# Ollama Configuration
+OLLAMA_BASE_URL=http://ollama:11434
+OLLAMA_MODEL=llama3
+
+# Backup Configuration
+BACKUP_ENABLED=true
+BACKUP_SCHEDULE="0 2 * * *"  # Daily at 2 AM

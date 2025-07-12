@@ -1,2 +1,11 @@
 flask
 flask-cors
+
+gunicorn[gevent]
+gevent
+flask-cors
+python-dotenv
+
+# For health checks and monitoring
+psutil
+prometheus-client

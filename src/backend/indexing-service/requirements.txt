@@ -7,3 +7,12 @@ chromadb
 ollama
 PyPDF2
 unstructured
+
+gunicorn[gevent]
+gevent
+flask-cors
+python-dotenv
+
+# For health checks and monitoring
+psutil
+prometheus-client
