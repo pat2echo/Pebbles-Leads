@@ -1,49 +1,20 @@
-"""
-Core RAG Service - Enhanced RAG processing with memory integration
-Port: 8001
-"""
-
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 import os
-import time
-import logging
 import requests
-import uuid
 from datetime import datetime
+import uuid
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import psutil
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
-
-# Import your existing langchain classes
+# Import your existing classes (simplified for core functionality)
 from langchain_community.llms import Ollama
 from langchain_community.embeddings import OllamaEmbeddings
 from langchain_chroma import Chroma
 
-# Configure logging for production
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-# Prometheus metrics
-REQUEST_COUNT = Counter('http_requests_total', 'Total HTTP requests', ['method', 'endpoint'])
-REQUEST_DURATION = Histogram('http_request_duration_seconds', 'HTTP request duration')
-
 app = Flask(__name__)
 CORS(app)
-
-# Production configuration
-app.config.update(
-    SECRET_KEY=os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production'),
-    DEBUG=False,
-    TESTING=False,
-    ENV='production'
-)
 
 class QueryType(Enum):
     FACTUAL = "factual"
@@ -51,37 +22,17 @@ class QueryType(Enum):
     OPINION = "opinion"
     CONTEXTUAL = "contextual"
 
+# Enhanced RAG processing logic
 class EnhancedCoreRAGProcessor:
     def __init__(self):
-        # Wait for Ollama to be ready
-        self._wait_for_ollama()
-        
         self.llm = Ollama(model="llama3", temperature=0.2, base_url="http://ollama:11434")
         self.embeddings = OllamaEmbeddings(model="nomic-embed-text", base_url="http://ollama:11434")
-        
-        # Create data directory if it doesn't exist
-        os.makedirs("/data/chroma_db", exist_ok=True)
-        
         self.vectorstore = Chroma(
             persist_directory="/data/chroma_db",
             embedding_function=self.embeddings
         )
         self.memory_service_url = os.getenv('MEMORY_SERVICE_URL', 'http://memory-service:8000')
         self.feedback_service_url = os.getenv('FEEDBACK_SERVICE_URL', 'http://feedback-service:8000')
-
-    def _wait_for_ollama(self, max_retries=30, delay=2):
-        """Wait for Ollama service to be ready"""
-        for i in range(max_retries):
-            try:
-                response = requests.get("http://ollama:11434/api/tags", timeout=5)
-                if response.status_code == 200:
-                    logger.info("Ollama service is ready")
-                    return
-            except Exception as e:
-                logger.info(f"Waiting for Ollama... attempt {i+1}/{max_retries}")
-                time.sleep(delay)
-        
-        logger.warning("Ollama service not ready, continuing anyway...")
 
     def classify_query(self, query: str) -> Dict[str, Any]:
         """Enhanced query classification"""
@@ -130,7 +81,6 @@ class EnhancedCoreRAGProcessor:
                 "reasoning": reasoning
             }
         except Exception as e:
-            logger.error(f"Error in query classification: {e}")
             return {
                 "query_type": "factual",
                 "confidence": 0.5,
@@ -176,7 +126,7 @@ class EnhancedCoreRAGProcessor:
                 for i, doc in enumerate(unique_docs)
             ]
         except Exception as e:
-            logger.error(f"Error retrieving documents: {e}")
+            print(f"Error retrieving documents: {e}")
             return []
 
     def generate_response(self, query: str, documents: List[Dict], query_type: str, 
@@ -240,95 +190,19 @@ Contextual Answer:"""
             response = self.llm.invoke(prompt)
             return response.strip()
         except Exception as e:
-            logger.error(f"Error generating response: {e}")
             return f"Error generating response: {str(e)}"
 
-# Initialize processor
 processor = EnhancedCoreRAGProcessor()
-
-# Middleware for request tracking
-@app.before_request
-def before_request():
-    """Track request metrics"""
-    REQUEST_COUNT.labels(method=request.method, endpoint=request.endpoint).inc()
-
-@app.after_request
-def after_request(response):
-    """Log requests in production"""
-    logger.info(f"{request.method} {request.path} - {response.status_code}")
-    return response
-
-# Error handlers
-@app.errorhandler(404)
-def not_found_error(error):
-    return jsonify({'error': 'Not found'}), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    logger.error(f"Internal server error: {str(error)}")
-    return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint for load balancer"""
-    try:
-        memory_usage = psutil.virtual_memory().percent
-        cpu_usage = psutil.cpu_percent(interval=1)
-        
-        # Test vectorstore connection
-        vectorstore_healthy = True
-        try:
-            processor.vectorstore._collection.count()
-        except Exception as e:
-            vectorstore_healthy = False
-            logger.error(f"Vectorstore health check failed: {e}")
-        
-        # Test Ollama connection
-        ollama_healthy = True
-        try:
-            requests.get("http://ollama:11434/api/tags", timeout=5)
-        except Exception as e:
-            ollama_healthy = False
-            logger.error(f"Ollama health check failed: {e}")
-        
-        health_status = {
-            'status': 'healthy',
-            'service': os.environ.get('SERVICE_NAME', 'core-rag-service'),
-            'memory_usage_percent': memory_usage,
-            'cpu_usage_percent': cpu_usage,
-            'vectorstore_healthy': vectorstore_healthy,
-            'ollama_healthy': ollama_healthy,
-            'timestamp': int(time.time())
-        }
-        
-        # Consider unhealthy if resource usage is too high or dependencies are down
-        if memory_usage > 90 or cpu_usage > 90 or not vectorstore_healthy or not ollama_healthy:
-            health_status['status'] = 'unhealthy'
-            return jsonify(health_status), 503
-            
-        return jsonify(health_status), 200
-        
-    except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e),
-            'timestamp': int(time.time())
-        }), 503
-
-@app.route('/metrics')
-def metrics():
-    """Prometheus metrics endpoint"""
-    return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
+    return jsonify({"status": "healthy", "service": "core-rag"})
 
 @app.route('/test/index', methods=['GET'])
 def get_first_five_entries():
     """Get the first 5 entries in the index"""
-    try:
-        result = processor.retrieve_documents(query="test", query_type="factual")
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    result = processor.retrieve_documents(query="Mental", query_type="factual")
+    return jsonify(result)
     
 @app.route('/process', methods=['POST'])
 def process_query():
@@ -357,7 +231,7 @@ def process_query():
                     conversation_context = context_data.get('conversation_context', '')
                     current_topic = context_data.get('current_topic', 'general')
             except Exception as e:
-                logger.warning(f"Memory service error: {e}")
+                print(f"Memory service error: {e}")
         
         # Process the query with enhanced classification
         classification = processor.classify_query(query)
@@ -410,12 +284,11 @@ def process_query():
                     response_data["current_topic"] = memory_data.get("current_topic", current_topic)
                     
             except Exception as e:
-                logger.warning(f"Error storing turn in memory: {e}")
+                print(f"Error storing turn in memory: {e}")
         
         return jsonify(response_data)
         
     except Exception as e:
-        logger.error(f"Error processing query: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
